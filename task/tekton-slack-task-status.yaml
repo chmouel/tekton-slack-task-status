@@ -1,0 +1,66 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: send-slack-notification
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.13.1"
+    tekton.dev/tags: slack, openshift
+    tekton.dev/displayName: openshift
+spec:
+  description: >-
+    This task will send a slack notification introspecting which task as failed.
+    optionally if it can it will figure it out a link to the log on OpenShift Console.
+  params:
+    - name: slack-webhook-secret-name
+      description: The secret where the slack webhook url is
+      default: slack-webhook-url
+    - name: slack-webhook-secret-key
+      description: The key inside the secret to find the slack webhook url value
+      default: hook_url
+    - name: success_url_image
+      description: The image to show when the pipeline has success
+      default: "https://github.com/tektoncd.png"
+    - name: failure_url_image
+      description: The image to show when the pipeline has failed
+      default: "https://www.vhv.rs/dpng/d/415-4154815_grumpy-cat-png-photos-grumpy-cat-png-transparent.png"
+    - name: success_text
+      description: "The text to show when the pipeline has been successfull"
+      default: "Wonderful the pipeline has run successfully. :joy:"
+    - name: failure_text
+      default: "The text to show when the pipeline has failed"
+    - name: log_url
+      default: ""
+      description: "The log url prefix if any, set this to \"openshift\" to autodetect it if you have the rights for it"
+    - name: openshift
+      default: 'false'
+      description: "Set this variable to true if you want to automatically construct the openshift console log urls, you need to set log_url to the console url if you don't have the rights to detect the console route."
+  steps:
+    - name: send-slack-notification
+      image: public.ecr.aws/k7a1h8a0/aws-kubectl
+      env:
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: $(params.slack-webhook-secret-name)
+              key: $(params.slack-webhook-secret-key)
+        - name: PIPELINERUN
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['tekton.dev/pipelineRun']
+        - name: SUCCESS_URL_IMAGE
+          value: $(params.success_url_image)
+        - name: FAILURE_URL_IMAGE
+          value: $(params.failure_url_image)
+        - name: SUCCESS_TEST
+          value: $(params.success_text)
+        - name: FAILURE_TEST
+          value: $(params.failure_text)
+        - name: LOG_URL
+          value: $(params.log_url)
+        - name: OPENSHIFT
+          value: $(params.openshift)
+      script: |
+        #include tekton-slack-task-status.yaml

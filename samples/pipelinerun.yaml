@@ -1,0 +1,41 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: send-slack-notification-sample
+spec:
+  pipelineSpec:
+    tasks:
+      - name: fail
+        taskSpec:
+          steps:
+            - name: failit
+              image: registry.access.redhat.com/ubi8/ubi-minimal:8.3
+              script: 'exit 1'
+      - name: fail2
+        taskSpec:
+          steps:
+            - name: failit
+              image: registry.access.redhat.com/ubi8/ubi-minimal:8.3
+              script: 'exit 1'
+      - name: success
+        taskSpec:
+          steps:
+            - name: failit
+              image: registry.access.redhat.com/ubi8/ubi-minimal:8.3
+              script: 'exit 0'
+      - name: success2
+        taskSpec:
+          steps:
+            - name: failit
+              image: registry.access.redhat.com/ubi8/ubi-minimal:8.3
+              script: 'exit 0'
+    finally:
+      - name: finally
+        taskRef:
+          name: send-slack-notification
+        params:
+          - name: log_url
+            value: "https://console-openshift-console.apps.chmouel.devcluster.openshift.com"
+          - name: openshift
+            value: "true"
