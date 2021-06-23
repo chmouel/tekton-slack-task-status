@@ -14,6 +14,9 @@ spec:
     This task will send a slack notification introspecting which task as failed.
     optionally if it can it will figure it out a link to the log on OpenShift Console.
   params:
+    - name: report_success
+      description: Wether to report success as well by default only failures are reported (true or false).
+      default: "false"
     - name: slack-webhook-secret-name
       description: The secret where the slack webhook url is
       default: slack-webhook-url
@@ -62,5 +65,7 @@ spec:
           value: $(params.log_url)
         - name: OPENSHIFT
           value: $(params.openshift)
+        - name: REPORT_SUCCESS
+          value: $(params.report_success)
       script: |
-        #include tekton-slack-task-status.yaml
+        #include tekton-slack-task-status.py

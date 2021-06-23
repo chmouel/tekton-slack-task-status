@@ -160,6 +160,10 @@ def main() -> int:
         default=os.environ.get("GITHUB_PULL_LABEL"),
         help="pull_request.labels dict as get from tekton asa code")
 
+    parser.add_argument("--report-success",
+                        default=os.environ.get("REPORT_SUCCESS"),
+                        help="wether to report success as well")
+
     parser.add_argument("--pipelinerun",
                         default=os.environ.get("PIPELINERUN"),
                         help="The pipelinerun to check the status on")
@@ -214,6 +218,9 @@ def main() -> int:
 
     if args.log_url:
         slack_text += f"• *PipelineRun logs*: {args.log_url}"
+
+    if not failures and args.report_success.lower() != "true":
+        return 0
 
     ret = send_slack_message(args.slack_webhook_url, slack_subject, slack_text,
                              slack_image)

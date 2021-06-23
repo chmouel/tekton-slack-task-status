@@ -1,4 +1,4 @@
 all: generate
 
 generate: 
-	@./hack/tekton-task-embed-script.py task/tekton-slack-task-status.py | tee tekton-slack-task-status.yaml
+	@./hack/tekton-task-embed-script.py task/tekton-slack-task-status.yaml | tee tekton-slack-task-status.yaml

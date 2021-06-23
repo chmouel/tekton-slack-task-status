@@ -7,6 +7,9 @@ pipeline section.
 
 ## Parameters
 
+* **report_success**: by default we only report failures, set this "`"true"`" if
+  you like to report success as well.
+
 * **slack-webhook-secret-name**: The secret name where the webhook url is
   stored.
 
