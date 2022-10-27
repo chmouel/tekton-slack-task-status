@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "tekton-slack-task-status"
+version = "0.1.0"
+description = "A Tekton task to report slack status"
+authors = ["Chmouel Boudjnah <chmouel@chmouel.com>"]
+license = "Apache"
+readme = "README.md"
+packages = [{include = "tekton_slack_task_status"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+ruamel-yaml = "^0.17.21"
+
+[tool.poetry.group.dev.dependencies]
+pylint = "^2.15.5"
+mypy = "^0.982"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
