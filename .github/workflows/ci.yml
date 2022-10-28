@@ -21,4 +21,4 @@ jobs:
         make lint
     - name: Check black formatting
       run: |
-        poetry run black --check .
+        poetry run black --check . --diff
