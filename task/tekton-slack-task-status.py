@@ -45,14 +45,36 @@ def check_label(label_eval: str, label_to_check: str) -> bool:
     return bool([x for x in eval(label_eval) if x["name"] == label_to_check])
 
 
-def get_json_of_pipelinerun(pipelinerun: str) -> typing.Dict[str, typing.Dict]:
+def get_json_of_pipelinerun(
+    namespace: str | None, pipelinerun: str
+) -> typing.Dict[str, typing.Dict]:
     """Find which namespace where we are running currently by checking the
     pipelinerun namespace"""
-    cmd = f"kubectl get pipelinerun {pipelinerun} -o json"
+    ns = namespace and f"-n {namespace}" or ""
+    cmd = f"kubectl get pipelinerun {ns} {pipelinerun} -o json"
     ret = subprocess.run(cmd, shell=True, check=True, capture_output=True)
     if ret.returncode != 0:
         raise SlackNotificationError(f"Could not run command: {cmd}")
     return json.loads(ret.stdout)
+
+
+def get_status_from_taskruns(
+    namespace: str | None,
+    taskruns: typing.List[typing.Dict],
+) -> typing.Dict[str, typing.Dict]:
+    """Get status for taskruns when using minimal status"""
+    retD = {}
+    ns = namespace and f"-n {namespace}" or ""
+    for taskrun in taskruns:
+        if taskrun["kind"] != "TaskRun":
+            continue
+        cmd = f"kubectl get {ns} taskrun {taskrun['name']} -o json"
+        ret = subprocess.run(cmd, shell=True, check=True, capture_output=True)
+        if ret.returncode != 0:
+            raise SlackNotificationError(f"Could not run command: {cmd}")
+        jeez = json.loads(ret.stdout)
+        retD[jeez["metadata"]["name"]] = {"status": jeez["status"]}
+    return retD
 
 
 def check_status_of_pipelinerun(
@@ -60,7 +82,12 @@ def check_status_of_pipelinerun(
 ) -> typing.Tuple[typing.List[str], typing.List[str]]:
     """Check status of a pipelinerun using kubectl, we avoid the the Running
     ones since we run in finally, it will have a running ones"""
-    task_runs = jeez["status"]["taskRuns"]
+    task_runs = {}
+    ns = jeez["metadata"]["namespace"]
+    if "taskRuns" in jeez["status"]:
+        task_runs = jeez["status"]["taskRuns"]
+    elif "childReferences" in jeez["status"]:
+        task_runs = get_status_from_taskruns(ns, jeez["status"]["childReferences"])
     failure = []
     success = []
 
@@ -185,6 +212,12 @@ def main() -> int:
         help="Slack webhook URL",
     )
 
+    parser.add_argument(
+        "-n",
+        "--namespace",
+        default=os.environ.get("SLACK_NS"),
+        help="Namespace to look the pipelinerun for (empty for current)",
+    )
     args = parser.parse_args()
     if args.label_to_check and args.github_pull_label:
         if not check_label(args.github_pull_label, args.label_to_check):
@@ -203,9 +236,13 @@ def main() -> int:
         )
         return 1
 
-    jeez = get_json_of_pipelinerun(args.pipelinerun)
+    jeez = get_json_of_pipelinerun(args.namespace, args.pipelinerun)
     namespace = jeez["metadata"]["namespace"]
-    if args.log_url == "" and args.openshift.lower() == "true":
+    if (
+        args.log_url == ""
+        and args.openshift is not None
+        and args.openshift.lower() == "true"
+    ):
         # TODO: Add tekton dashboard if we can find this automatically
         try:
             args.log_url = (
@@ -213,7 +250,7 @@ def main() -> int:
             )
         except subprocess.CalledProcessError:
             args.log_url = ""
-    elif args.openshift.lower() == "true" and args.log_url != "":
+    elif args.openshift and args.openshift.lower() == "true" and args.log_url != "":
         args.log_url = f"{args.log_url}/k8s/ns/{namespace}/tekton.dev~v1beta1~PipelineRun/{args.pipelinerun}/logs"
 
     failures, success = check_status_of_pipelinerun(args.log_url, jeez)
