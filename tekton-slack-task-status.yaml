@@ -103,9 +103,7 @@ spec:
 
       def get_openshift_console_url(namespace: str) -> str:
           """Get the openshift console url for a namespace"""
-          cmd = (
-              "kubectl get route -n openshift-console console -o jsonpath='{.spec.host}'",
-          )
+          cmd = ("kubectl get route -n openshift-console console -o jsonpath='{.spec.host}'",)
           ret = subprocess.run(cmd, shell=True, check=True, capture_output=True)
           if ret.returncode != 0:
               raise SlackNotificationError(
@@ -117,39 +115,69 @@ spec:
       def check_label(label_eval: str, label_to_check: str) -> bool:
           """Check a label: if you get a string that has all the labels as specified
           by github, it will eval it and check if one contains the label_to_check"""
-          return bool([x for x in eval(label_eval) if x['name'] == label_to_check])  # pylint: disable=eval-used
+          # pylint: disable=eval-used
+          return bool([x for x in eval(label_eval) if x["name"] == label_to_check])
 
 
-      def get_json_of_pipelinerun(pipelinerun: str) -> typing.Dict[str, typing.Dict]:
+      def get_json_of_pipelinerun(
+          namespace: str | None, pipelinerun: str
+      ) -> typing.Dict[str, typing.Dict]:
           """Find which namespace where we are running currently by checking the
           pipelinerun namespace"""
-          cmd = f"kubectl get pipelinerun {pipelinerun} -o json"
+          ns = namespace and f"-n {namespace}" or ""
+          cmd = f"kubectl get pipelinerun {ns} {pipelinerun} -o json"
           ret = subprocess.run(cmd, shell=True, check=True, capture_output=True)
           if ret.returncode != 0:
               raise SlackNotificationError(f"Could not run command: {cmd}")
           return json.loads(ret.stdout)
 
 
+      def get_status_from_taskruns(
+          namespace: str | None,
+          taskruns: typing.List[typing.Dict],
+      ) -> typing.Dict[str, typing.Dict]:
+          """Get status for taskruns when using minimal status"""
+          retD = {}
+          ns = namespace and f"-n {namespace}" or ""
+          for taskrun in taskruns:
+              if taskrun["kind"] != "TaskRun":
+                  continue
+              cmd = f"kubectl get {ns} taskrun {taskrun['name']} -o json"
+              ret = subprocess.run(cmd, shell=True, check=True, capture_output=True)
+              if ret.returncode != 0:
+                  raise SlackNotificationError(f"Could not run command: {cmd}")
+              jeez = json.loads(ret.stdout)
+              retD[jeez["metadata"]["name"]] = {"status": jeez["status"]}
+          return retD
+
+
       def check_status_of_pipelinerun(
-          log_prefix: str,
-          jeez: typing.Dict[str,
-                            typing.Dict]) -> (typing.List[str], typing.List[str]):
+          log_prefix: str, jeez: typing.Dict[str, typing.Dict]
+      ) -> typing.Tuple[typing.List[str], typing.List[str]]:
           """Check status of a pipelinerun using kubectl, we avoid the the Running
           ones since we run in finally, it will have a running ones"""
-          task_runs = jeez['status']['taskRuns']
+          task_runs = {}
+          ns = jeez["metadata"]["namespace"]
+          if "taskRuns" in jeez["status"]:
+              task_runs = jeez["status"]["taskRuns"]
+          elif "childReferences" in jeez["status"]:
+              task_runs = get_status_from_taskruns(ns, jeez["status"]["childReferences"])
           failure = []
           success = []
 
-          pname = jeez['metadata']['name']
+          pname = jeez["metadata"]["name"]
           for task in task_runs.keys():
-              bname = task.replace(pname + "-", '')
-              bname = bname.replace("-" + bname.split("-")[-1], '')
+              bname = task.replace(pname + "-", "")
+              bname = bname.replace("-" + bname.split("-")[-1], "")
               if log_prefix != "":
                   bname = f"<{log_prefix}/{bname}|{bname}>"
-              if bool([
-                      x['message'] for x in task_runs[task]['status']['conditions']
-                      if x['status'] != 'Running' and x['status'] == 'False'
-              ]):
+              if bool(
+                  [
+                      x["message"]
+                      for x in task_runs[task]["status"]["conditions"]
+                      if x["status"] != "Running" and x["status"] == "False"
+                  ]
+              ):
                   failure.append(bname)
               else:
                   success.append(bname)
@@ -157,34 +185,36 @@ spec:
           return failure, success
 
 
-      def send_slack_message(webhook_url: str, subject: str, text: str,
-                             icon: str) -> str:
+      def send_slack_message(webhook_url: str, subject: str, text: str, icon: str) -> str:
           """Send a slack message"""
           msg = {
-              "text":
-              subject,
-              "attachments": [{
-                  "blocks": [
-                      {
-                          "type": "section",
-                          "text": {
-                              "type": "mrkdwn",
-                              "text": text,
+              "text": subject,
+              "attachments": [
+                  {
+                      "blocks": [
+                          {
+                              "type": "section",
+                              "text": {
+                                  "type": "mrkdwn",
+                                  "text": text,
+                              },
+                              "accessory": {
+                                  "type": "image",
+                                  "image_url": icon,
+                                  "alt_text": "From tekton with love",
+                              },
                           },
-                          "accessory": {
-                              "type": "image",
-                              "image_url": icon,
-                              "alt_text": "From tekton with love"
-                          }
-                      },
-                  ]
-              }]
+                      ]
+                  }
+              ],
           }
 
-          req = urllib.request.Request(webhook_url,
-                                       data=json.dumps(msg).encode(),
-                                       headers={"Content-type": "application/json"},
-                                       method="POST")
+          req = urllib.request.Request(
+              webhook_url,
+              data=json.dumps(msg).encode(),
+              headers={"Content-type": "application/json"},
+              method="POST",
+          )
           # TODO: Handle error?
           return urllib.request.urlopen(req).read().decode()
 
@@ -197,20 +227,24 @@ spec:
               "--failure-url-image",
               default=os.environ.get(
                   "FAILURE_URL_IMAGE",
-                  "https://publicdomainvectors.org/photos/21826-REMIX-ARRET.png"),
-              help="The icon of failure")
+                  "https://publicdomainvectors.org/photos/21826-REMIX-ARRET.png",
+              ),
+              help="The icon of failure",
+          )
 
           parser.add_argument(
               "--success-url-image",
               default=os.environ.get(
-                  "SUCCESS_URL_IMAGE",
-                  "https://publicdomainvectors.org/photos/Checkmark.png"),
-              help="The icon of success")
+                  "SUCCESS_URL_IMAGE", "https://publicdomainvectors.org/photos/Checkmark.png"
+              ),
+              help="The icon of success",
+          )
 
-          parser.add_argument("--failure-text",
-                              help="The text of the slack message when failure",
-                              default=os.environ.get("FAILURE_TEXT",
-                                                     "CI has failed :cry:"))
+          parser.add_argument(
+              "--failure-text",
+              help="The text of the slack message when failure",
+              default=os.environ.get("FAILURE_TEXT", "CI has failed :cry:"),
+          )
 
           parser.add_argument(
               "--success-text",
@@ -218,34 +252,46 @@ spec:
               help="The text of the slack message when succes",
           )
 
-          parser.add_argument("--log-url",
-                              default=os.environ.get("LOG_URL"),
-                              help="Link to the log url")
+          parser.add_argument(
+              "--log-url", default=os.environ.get("LOG_URL"), help="Link to the log url"
+          )
 
           parser.add_argument(
               "--openshift",
               default=os.environ.get("OPENSHIFT"),
-              help=
-              "Wethere we are running on OpenShift and then auto construct the URL, set this to true"
+              help="Wethere we are running on OpenShift and then auto construct the URL, set this to true",
           )
 
           parser.add_argument(
               "--github-pull-label",
               default=os.environ.get("GITHUB_PULL_LABEL"),
-              help="pull_request.labels dict as get from tekton asa code")
+              help="pull_request.labels dict as get from tekton asa code",
+          )
 
-          parser.add_argument("--report-success",
-                              default=os.environ.get("REPORT_SUCCESS"),
-                              help="wether to report success as well")
+          parser.add_argument(
+              "--report-success",
+              default=os.environ.get("REPORT_SUCCESS"),
+              help="wether to report success as well",
+          )
 
-          parser.add_argument("--pipelinerun",
-                              default=os.environ.get("PIPELINERUN"),
-                              help="The pipelinerun to check the status on")
+          parser.add_argument(
+              "--pipelinerun",
+              default=os.environ.get("PIPELINERUN"),
+              help="The pipelinerun to check the status on",
+          )
 
-          parser.add_argument("--slack-webhook-url",
-                              default=os.environ.get("SLACK_WEBHOOK_URL"),
-                              help="Slack webhook URL")
+          parser.add_argument(
+              "--slack-webhook-url",
+              default=os.environ.get("SLACK_WEBHOOK_URL"),
+              help="Slack webhook URL",
+          )
 
+          parser.add_argument(
+              "-n",
+              "--namespace",
+              default=os.environ.get("SLACK_NS"),
+              help="Namespace to look the pipelinerun for (empty for current)",
+          )
           args = parser.parse_args()
           if args.label_to_check and args.github_pull_label:
               if not check_label(args.github_pull_label, args.label_to_check):
@@ -255,9 +301,7 @@ spec:
                   return 0
 
           if not args.pipelinerun:
-              print(
-                  "error --pipelinerun need to be set via env env variable or other means."
-              )
+              print("error --pipelinerun need to be set via env env variable or other means.")
               return 1
 
           if not args.slack_webhook_url:
@@ -266,16 +310,21 @@ spec:
               )
               return 1
 
-          jeez = get_json_of_pipelinerun(args.pipelinerun)
-          namespace = jeez['metadata']['namespace']
-          if args.log_url == "" and args.openshift.lower() == "true":
+          jeez = get_json_of_pipelinerun(args.namespace, args.pipelinerun)
+          namespace = jeez["metadata"]["namespace"]
+          if (
+              args.log_url == ""
+              and args.openshift is not None
+              and args.openshift.lower() == "true"
+          ):
               # TODO: Add tekton dashboard if we can find this automatically
               try:
-                  args.log_url = get_openshift_console_url(namespace) + \
-                      args.pipelinerun + "/logs"
+                  args.log_url = (
+                      get_openshift_console_url(namespace) + args.pipelinerun + "/logs"
+                  )
               except subprocess.CalledProcessError:
                   args.log_url = ""
-          elif args.openshift.lower() == "true" and args.log_url != "":
+          elif args.openshift and args.openshift.lower() == "true" and args.log_url != "":
               args.log_url = f"{args.log_url}/k8s/ns/{namespace}/tekton.dev~v1beta1~PipelineRun/{args.pipelinerun}/logs"
 
           failures, success = check_status_of_pipelinerun(args.log_url, jeez)
@@ -296,13 +345,14 @@ spec:
           if not failures and args.report_success.lower() != "true":
               return 0
 
-          ret = send_slack_message(args.slack_webhook_url, slack_subject, slack_text,
-                                   slack_image)
+          ret = send_slack_message(
+              args.slack_webhook_url, slack_subject, slack_text, slack_image
+          )
           if ret:
               print(ret)
 
           return 0
 
 
-      if __name__ == '__main__':
+      if __name__ == "__main__":
           sys.exit(main())
