@@ -46,7 +46,7 @@ def check_label(label_eval: str, label_to_check: str) -> bool:
 
 
 def get_json_of_pipelinerun(
-    namespace: str | None, pipelinerun: str
+    namespace: str, pipelinerun: str
 ) -> typing.Dict[str, typing.Dict]:
     """Find which namespace where we are running currently by checking the
     pipelinerun namespace"""
@@ -59,7 +59,7 @@ def get_json_of_pipelinerun(
 
 
 def get_status_from_taskruns(
-    namespace: str | None,
+    namespace: str,
     taskruns: typing.List[typing.Dict],
 ) -> typing.Dict[str, typing.Dict]:
     """Get status for taskruns when using minimal status"""
