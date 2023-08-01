@@ -57,9 +57,9 @@ spec:
           value: $(params.success_url_image)
         - name: FAILURE_URL_IMAGE
           value: $(params.failure_url_image)
-        - name: SUCCESS_TEST
+        - name: SUCCESS_TEXT
           value: $(params.success_text)
-        - name: FAILURE_TEST
+        - name: FAILURE_TEXT
           value: $(params.failure_text)
         - name: LOG_URL
           value: $(params.log_url)
