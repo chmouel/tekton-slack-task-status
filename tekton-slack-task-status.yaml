@@ -46,7 +46,7 @@ spec:
       you don't have the rights to detect the console route.
   steps:
   - name: send-slack-notification
-    image: public.ecr.aws/k7a1h8a0/aws-kubectl
+    image: chainguard/kubectl
     env:
     - name: SLACK_WEBHOOK_URL
       valueFrom:
