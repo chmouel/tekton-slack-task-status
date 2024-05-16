@@ -36,13 +36,13 @@ spec:
       default: "The text to show when the pipeline has failed"
     - name: log_url
       default: ""
-      description: "The log url prefix if any, set this to \"openshift\" to autodetect it if you have the rights for it"
+      description: 'The log url prefix if any, set this to "openshift" to autodetect it if you have the rights for it'
     - name: openshift
-      default: 'false'
+      default: "false"
       description: "Set this variable to true if you want to automatically construct the openshift console log urls, you need to set log_url to the console url if you don't have the rights to detect the console route."
   steps:
     - name: send-slack-notification
-      image: public.ecr.aws/k7a1h8a0/aws-kubectl
+      image: registry.access.redhat.com/ubi9/python-311
       env:
         - name: SLACK_WEBHOOK_URL
           valueFrom:
