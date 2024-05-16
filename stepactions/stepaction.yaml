@@ -9,12 +9,10 @@ spec:
   params:
     - name: pipelineRun
       type: string
-      description: The name of the PipelineRun
-      default: "$(context.pipelineRun.name)"
+      description: "The name of the PipelineRun, eg: $(context.pipelineRun.name)"
     - name: namespace
       type: string
-      description: The namespace of the PipelineRun
-      default: "$(context.pipelineRun.namespace)"
+      description: "The namespace of the PipelineRun, eg: $(context.pipelineRun.namespace)"
     - name: openshift_console_host
       type: string
       description: The URL of the cluster
