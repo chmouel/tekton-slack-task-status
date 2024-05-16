@@ -15,7 +15,7 @@ spec:
       type: string
       description: The namespace of the PipelineRun
       default: "$(context.pipelineRun.namespace)"
-    - name: openshift_console_url
+    - name: openshift_console_host
       type: string
       description: The URL of the cluster
     - name: image_url
@@ -32,8 +32,8 @@ spec:
       value: "$(params.pipelineRun)"
     - name: NAMESPACE
       value: "$(params.namespace)"
-    - name: OPENSHIFT_CONSOLE_URL
-      value: "$(params.openshift_console_url)"
+    - name: OPENSHIFT_CONSOLE_HOST
+      value: "$(params.openshift_console_host)"
     - name: IMAGE_URL
       value: "$(params.image_url)"
   # I just need curl and bash really
@@ -96,7 +96,7 @@ spec:
             "type": "section",
             "text": {
               "type": "mrkdwn",
-              "text": "See <https://${OPENSHIFT_CONSOLE_URL}/k8s/ns/${NAMESPACE}/tekton.dev~v1~PipelineRun/${PIPELINERUN}|OpenShift Console> for more details\n\n_${haiku}_"
+              "text": "See <https://${OPENSHIFT_CONSOLE_HOST}/k8s/ns/${NAMESPACE}/tekton.dev~v1~PipelineRun/${PIPELINERUN}|OpenShift Console> for more details\n\n_${haiku}_"
             },
             "accessory": {
               "type": "image",
